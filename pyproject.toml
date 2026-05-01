@@ -1,0 +1,17 @@
+[project]
+name = "yt-dlp-kit"
+version = "0.1.0"
+description = "Video download and preview MCP server powered by yt-dlp"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.13",
+    "flask>=3.0",
+    "yt-dlp>=2026.3",
+]
+
+[project.scripts]
+yt-dlp-kit-mcp = "mcp_server:mcp.run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
