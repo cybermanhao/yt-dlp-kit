@@ -36,6 +36,7 @@ class LiveMonitor:
         self._monitor_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
+        self._procs: dict[str, subprocess.Popen] = {}  # url -> active ffmpeg process
 
         # Callbacks
         self.on_live_start: Optional[Callable[[str, dict], None]] = None
@@ -138,85 +139,120 @@ class LiveMonitor:
             return False
 
     def _start_recording(self, room: dict) -> subprocess.Popen:
-        """Start a yt-dlp subprocess to record the stream."""
+        """Start an ffmpeg subprocess to record the stream directly.
+
+        Uses yt-dlp only to extract the stream URL, then ffmpeg for robust
+        recording. This avoids fmp4 extension issues and .part file handling.
+        """
         url = room["url"]
         out_dir = Path(room["output_dir"])
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        # Build timestamped filename
+        # Build timestamped filename (sanitize for Windows)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        name = f"{room['name']}_{ts}"
+        room_name = room['name']
+        for ch in '<>:"/\\|?*':
+            room_name = room_name.replace(ch, '_')
+        name = f"{room_name}_{ts}"
+        output_path = out_dir / f"{name}.mp4"
 
-        opts = self.engine._base_opts(url)
-        opts.update({
-            "live_from_start": True,
-            "outtmpl": str(out_dir / f"{name}.%(ext)s"),
-            "quiet": True,
-            "no_warnings": True,
-        })
-
-        fmt = room.get("fmt")
-        if fmt and self.engine._platform(url) != "bilibili":
-            opts["format"] = fmt
-
-        # Segment duration via max_filesize approximation or subprocess timeout
-        segment = room.get("segment_duration")
-
-        # Write opts to temp file for subprocess
-        import tempfile
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump(opts, f)
-            opts_file = f.name
+        # Extract stream URL via yt-dlp
+        stream_url = self._get_stream_url(url, room.get("fmt"))
+        if not stream_url:
+            raise RuntimeError(f"Could not extract stream URL for {url}")
 
         cmd = [
-            sys.executable, "-c",
-            f"""
-import json, sys
-from yt_dlp import YoutubeDL
-with open({repr(opts_file)}) as f:
-    opts = json.load(f)
-with YoutubeDL(opts) as ydl:
-    ydl.download([{repr(url)}])
-"""
+            "ffmpeg", "-y",
+            "-i", stream_url,
+            "-c", "copy",
+            "-bsf:a", "aac_adtstoasc",
+            "-movflags", "frag_keyframe+empty_moov",
+            str(output_path),
         ]
 
-        # Start recording process
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self._procs[url] = proc
+
+        # Segment duration: gracefully stop and restart after interval
+        segment = room.get("segment_duration")
         if segment:
-            proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            # Schedule kill after segment_duration
-            def _kill_after():
+            def _segment_and_restart():
                 time.sleep(segment)
                 if proc.poll() is None:
-                    proc.terminate()
-                    time.sleep(2)
-                    if proc.poll() is None:
-                        proc.kill()
-            threading.Thread(target=_kill_after, daemon=True).start()
-        else:
-            proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    try:
+                        proc.stdin.write(b"q")
+                        proc.stdin.close()
+                        proc.wait(timeout=10)
+                    except (BrokenPipeError, subprocess.TimeoutExpired):
+                        proc.terminate()
+                        proc.wait()
+                    self._procs.pop(url, None)
+                    # Start next segment
+                    self._start_recording(room)
+            threading.Thread(target=_segment_and_restart, daemon=True).start()
 
         return proc
 
+    def _get_stream_url(self, url: str, fmt: Optional[str] = None) -> Optional[str]:
+        """Extract the best direct stream URL from a live page."""
+        from yt_dlp import YoutubeDL
+        from yt_dlp.utils._utils import _UnsafeExtensionError
+        _UnsafeExtensionError.ALLOWED_EXTENSIONS = _UnsafeExtensionError.ALLOWED_EXTENSIONS | {"fmp4"}
+
+        opts = self.engine._base_opts(url)
+        opts["quiet"] = True
+        with YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+        formats = info.get("formats", [])
+        if not formats:
+            return None
+
+        def sort_key(f):
+            if f.get("ext") == "fmp4":
+                return (2, f.get("tbr", 0) or 0, f.get("height", 0) or 0)
+            if f.get("ext") == "flv":
+                return (1, f.get("tbr", 0) or 0, f.get("height", 0) or 0)
+            return (0, f.get("tbr", 0) or 0, f.get("height", 0) or 0)
+
+        best = max(formats, key=sort_key)
+        return best.get("url")
+
     def _stop_recording(self, url: str) -> bool:
-        """Stop the recording process for a URL."""
+        """Stop the recording process for a URL gracefully via ffmpeg stdin."""
         state = self._load_state()
         recordings = state.get("recordings", {})
         rec = recordings.get(url)
         if not rec:
             return False
 
-        pid = rec.get("pid")
-        if pid:
+        # Graceful quit via stdin 'q' (flushes buffers and closes file)
+        proc = self._procs.pop(url, None)
+        if proc and proc.poll() is None:
             try:
-                os.kill(pid, signal.SIGTERM)
-                time.sleep(1)
+                proc.stdin.write(b"q")
+                proc.stdin.close()
+                proc.wait(timeout=10)
+            except (BrokenPipeError, subprocess.TimeoutExpired):
+                proc.terminate()
                 try:
-                    os.kill(pid, 0)  # Check if still alive
-                    os.kill(pid, signal.SIGKILL)
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+        else:
+            # Fallback: legacy PID-based kill
+            pid = rec.get("pid")
+            if pid:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                    time.sleep(1)
+                    try:
+                        os.kill(pid, 0)
+                        os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
                 except ProcessLookupError:
                     pass
-            except ProcessLookupError:
-                pass
 
         rec["status"] = "stopped"
         rec["stopped_at"] = datetime.now().isoformat()

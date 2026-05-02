@@ -7,6 +7,11 @@ from typing import Optional
 
 from core.downloader import YTDlpEngine
 from yt_dlp import YoutubeDL
+from yt_dlp.utils._utils import _UnsafeExtensionError
+
+# Allow fmp4 (Fragmented MP4) used by Bilibili live streams.
+# yt-dlp's safelist doesn't include fmp4, causing _UnsafeExtensionError.
+_UnsafeExtensionError.ALLOWED_EXTENSIONS = _UnsafeExtensionError.ALLOWED_EXTENSIONS | {"fmp4"}
 
 
 class LiveRecorder:
@@ -78,61 +83,79 @@ class LiveRecorder:
         Returns:
             Path to the recorded file (after recording completes)
         """
-        if not self.is_live(url):
+        # Extract everything in one yt-dlp call to avoid URL expiry.
+        info = self._extract_live_info(url, fmt)
+        if not info or not info.get("is_live"):
             raise RuntimeError(f"Stream is not live: {url}")
 
-        opts = self.engine._base_opts(url)
-        name = output_name or "%(title)s [%(id)s]"
-        opts.update({
-            "live_from_start": True,
-            "outtmpl": str(self.output_dir / f"{name}.%(ext)s"),
-        })
-        if fmt and self.engine._platform(url) != "bilibili":
-            opts["format"] = fmt
-        if duration:
-            opts["max_filesize"] = None  # yt-dlp doesn't have duration limit directly
-            # Workaround: we can use a subprocess with timeout
+        if not output_name:
+            title = info.get("title", "live")[:50]
+            # Sanitize filename for Windows
+            for ch in '<>:"/\\|?*':
+                title = title.replace(ch, '_')
+            name = f"{title}_{int(time.time())}"
+        else:
+            name = output_name
+        output_path = self.output_dir / f"{name}.mp4"
 
-        # For duration-limited recording, use subprocess with timeout
-        if duration:
-            return self._record_with_timeout(url, opts, duration)
-
-        with YoutubeDL(opts) as ydl:
-            self.engine._safe_call(ydl.download, [url])
-
-        # Find the newest file in output dir
-        files = sorted(self.output_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
-        return files[0] if files else self.output_dir
-
-    def _record_with_timeout(self, url: str, opts: dict, duration: int) -> Path:
-        """Record with a hard timeout using subprocess."""
-        import json, tempfile
-
-        # Write opts to a temp file and run yt-dlp via subprocess
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump(opts, f)
-            opts_file = f.name
+        stream_url = info.get("stream_url")
+        if not stream_url:
+            raise RuntimeError("Could not extract stream URL")
 
         cmd = [
-            "python", "-c",
-            f"""
-import json, sys
-from yt_dlp import YoutubeDL
-with open({repr(opts_file)}) as f:
-    opts = json.load(f)
-with YoutubeDL(opts) as ydl:
-    ydl.download([{repr(url)}])
-"""
+            "ffmpeg", "-y",
+            "-i", stream_url,
+            "-c", "copy",
+            "-bsf:a", "aac_adtstoasc",
+            "-movflags", "frag_keyframe+empty_moov",
+            str(output_path),
         ]
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
         try:
-            subprocess.run(cmd, timeout=duration, check=False)
+            proc.wait(timeout=duration)
         except subprocess.TimeoutExpired:
             print(f"[INFO] Recording stopped after {duration}s timeout")
-        finally:
-            Path(opts_file).unlink(missing_ok=True)
+            # Gracefully ask ffmpeg to quit (flushes buffers and closes file)
+            try:
+                proc.stdin.write(b"q")
+                proc.stdin.close()
+                proc.wait(timeout=10)
+            except (BrokenPipeError, subprocess.TimeoutExpired):
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
 
-        files = sorted(self.output_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
-        return files[0] if files else self.output_dir
+        return output_path if output_path.exists() else self.output_dir
+
+    def _extract_live_info(self, url: str, fmt: Optional[str] = None) -> Optional[dict]:
+        """Extract live info, title, and best stream URL in one call."""
+        opts = self.engine._base_opts(url)
+        opts["quiet"] = True
+        with YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+        if not info:
+            return None
+
+        formats = info.get("formats", [])
+        if not formats:
+            return None
+
+        def sort_key(f):
+            if f.get("ext") == "fmp4":
+                return (2, f.get("tbr", 0) or 0, f.get("height", 0) or 0)
+            if f.get("ext") == "flv":
+                return (1, f.get("tbr", 0) or 0, f.get("height", 0) or 0)
+            return (0, f.get("tbr", 0) or 0, f.get("height", 0) or 0)
+
+        best = max(formats, key=sort_key)
+        return {
+            "is_live": bool(info.get("is_live")),
+            "title": info.get("title", "live"),
+            "stream_url": best.get("url"),
+        }
 
     def wait_and_record(
         self,
