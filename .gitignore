@@ -63,9 +63,9 @@ live_monitor_state.json
 collect_*.py
 live_monitor.py
 
-# Skill market artifacts
-*.skill
-.skill-examples.json
+# Skill market artifacts (keep these in repo)
+# *.skill
+# .skill-examples.json
 
 # Planning docs
 PLAN-MCP.md

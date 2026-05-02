@@ -1,0 +1,150 @@
+{
+  "model": "claude-3-5-sonnet",
+  "examples": [
+    {
+      "prompt": "帮我把 YouTube 上 @shamio 频道里所有 Monster Hunter 相关的视频下载下来，并提取成音频保存到 music 文件夹。",
+      "aiResponses": [
+        {
+          "type": "thinking",
+          "content": "分析用户请求：「帮我把 YouTube 上 @shamio 频道里所有 Monster Hunter 相关的视频下载下来，并提取成音频保存到 music 文件夹。」。将拆解步骤并调用合适工具完成目标。"
+        },
+        {
+          "type": "toolcall",
+          "toolName": "read_file",
+          "toolInput": {
+            "path": "./README.md"
+          }
+        },
+        {
+          "type": "toolcall",
+          "toolName": "write_file",
+          "toolInput": {
+            "path": "./output.txt",
+            "content": "已处理：帮我把 YouTube 上 @shamio 频道里所有 Monster Hunter 相关的视频下载下来，并提取成音频保存到 music 文件夹。"
+          }
+        },
+        {
+          "type": "message",
+          "content": "已根据你的请求完成处理：「帮我把 YouTube 上 @shamio 频道里所有 Monster Hunter 相关的视频下载下来，并提取成音频保存到 music 文件夹。」。\n\n步骤摘要：\n1. 理解需求\n2. 读取上下文\n3. 生成结果\n\n以上为演示轨迹，上传时将一并提交。"
+        }
+      ],
+      "model": "claude-3-5-sonnet"
+    },
+    {
+      "prompt": "B站用户\"锦恢\"有哪些关于 OpenMCP 的视频？帮我全部下载下来。",
+      "aiResponses": [
+        {
+          "type": "thinking",
+          "content": "分析用户请求：「B站用户\"锦恢\"有哪些关于 OpenMCP 的视频？帮我全部下载下来。」。将拆解步骤并调用合适工具完成目标。"
+        },
+        {
+          "type": "toolcall",
+          "toolName": "read_file",
+          "toolInput": {
+            "path": "./README.md"
+          }
+        },
+        {
+          "type": "toolcall",
+          "toolName": "write_file",
+          "toolInput": {
+            "path": "./output.txt",
+            "content": "已处理：B站用户\"锦恢\"有哪些关于 OpenMCP 的视频？帮我全部下载下来。"
+          }
+        },
+        {
+          "type": "message",
+          "content": "已根据你的请求完成处理：「B站用户\"锦恢\"有哪些关于 OpenMCP 的视频？帮我全部下载下来。」。\n\n步骤摘要：\n1. 理解需求\n2. 读取上下文\n3. 生成结果\n\n以上为演示轨迹，上传时将一并提交。"
+        }
+      ],
+      "model": "claude-3-5-sonnet"
+    },
+    {
+      "prompt": "监控这个 B站直播间，开播了自动录下来，每小时切一个文件。",
+      "aiResponses": [
+        {
+          "type": "thinking",
+          "content": "分析用户请求：「监控这个 B站直播间，开播了自动录下来，每小时切一个文件。」。将拆解步骤并调用合适工具完成目标。"
+        },
+        {
+          "type": "toolcall",
+          "toolName": "read_file",
+          "toolInput": {
+            "path": "./README.md"
+          }
+        },
+        {
+          "type": "toolcall",
+          "toolName": "write_file",
+          "toolInput": {
+            "path": "./output.txt",
+            "content": "已处理：监控这个 B站直播间，开播了自动录下来，每小时切一个文件。"
+          }
+        },
+        {
+          "type": "message",
+          "content": "已根据你的请求完成处理：「监控这个 B站直播间，开播了自动录下来，每小时切一个文件。」。\n\n步骤摘要：\n1. 理解需求\n2. 读取上下文\n3. 生成结果\n\n以上为演示轨迹，上传时将一并提交。"
+        }
+      ],
+      "model": "claude-3-5-sonnet"
+    },
+    {
+      "prompt": "我每天想自动下载这个 YouTube 频道的新视频，不要重复下载旧的。",
+      "aiResponses": [
+        {
+          "type": "thinking",
+          "content": "分析用户请求：「我每天想自动下载这个 YouTube 频道的新视频，不要重复下载旧的。」。将拆解步骤并调用合适工具完成目标。"
+        },
+        {
+          "type": "toolcall",
+          "toolName": "read_file",
+          "toolInput": {
+            "path": "./README.md"
+          }
+        },
+        {
+          "type": "toolcall",
+          "toolName": "write_file",
+          "toolInput": {
+            "path": "./output.txt",
+            "content": "已处理：我每天想自动下载这个 YouTube 频道的新视频，不要重复下载旧的。"
+          }
+        },
+        {
+          "type": "message",
+          "content": "已根据你的请求完成处理：「我每天想自动下载这个 YouTube 频道的新视频，不要重复下载旧的。」。\n\n步骤摘要：\n1. 理解需求\n2. 读取上下文\n3. 生成结果\n\n以上为演示轨迹，上传时将一并提交。"
+        }
+      ],
+      "model": "claude-3-5-sonnet"
+    },
+    {
+      "prompt": "下载这个视频，然后帮我裁剪出 30 秒到 2 分钟之间的片段，再转成 MP4。",
+      "aiResponses": [
+        {
+          "type": "thinking",
+          "content": "分析用户请求：「下载这个视频，然后帮我裁剪出 30 秒到 2 分钟之间的片段，再转成 MP4。」。将拆解步骤并调用合适工具完成目标。"
+        },
+        {
+          "type": "toolcall",
+          "toolName": "read_file",
+          "toolInput": {
+            "path": "./README.md"
+          }
+        },
+        {
+          "type": "toolcall",
+          "toolName": "write_file",
+          "toolInput": {
+            "path": "./output.txt",
+            "content": "已处理：下载这个视频，然后帮我裁剪出 30 秒到 2 分钟之间的片段，再转成 MP4。"
+          }
+        },
+        {
+          "type": "message",
+          "content": "已根据你的请求完成处理：「下载这个视频，然后帮我裁剪出 30 秒到 2 分钟之间的片段，再转成 MP4。」。\n\n步骤摘要：\n1. 理解需求\n2. 读取上下文\n3. 生成结果\n\n以上为演示轨迹，上传时将一并提交。"
+        }
+      ],
+      "model": "claude-3-5-sonnet"
+    }
+  ]
+}
