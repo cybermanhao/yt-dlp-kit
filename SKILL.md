@@ -7,7 +7,7 @@ examples:
   - prompt: 监控这个 B站直播间，开播了自动录下来，每小时切一个文件。
   - prompt: 我每天想自动下载这个 YouTube 频道的新视频，不要重复下载旧的。
   - prompt: 下载这个视频，然后帮我裁剪出 30 秒到 2 分钟之间的片段，再转成 MP4。
-rootUrl: https://raw.githubusercontent.com/cybermanhao/yt-dlp-kit/main/SKILL.md
+rootUrl: https://raw.githubusercontent.com/cybermanhao/yt-dlp-kit/master/SKILL.md
 ---
 
 # yt-dlp-kit
