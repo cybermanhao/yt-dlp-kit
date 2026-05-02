@@ -59,19 +59,16 @@ live_monitor_config.json
 live_monitor_state.json
 .skill-examples.json
 
-# Demo / utility scripts (not part of core library)
+# Old/abandoned scripts
 collect_*.py
-demo_*.py
-get_bili_cookie.py
-search_bili_user.py
 live_monitor.py
 
 # Skill market artifacts
 *.skill
+.skill-examples.json
 
 # Planning docs
 PLAN-MCP.md
 
 # yt-dlp source reference (symlink/junction to external repo)
 reference
-references/
